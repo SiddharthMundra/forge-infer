@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package llm.inference.v1;
+
+option cc_enable_arenas = true;
+
+// Concurrent LLM inference API. Designed for continuous batching:
+// many Generate streams share one GPU forward pass per scheduling step.
+
+service InferenceService {
+  // Non-streaming completion.
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+
+  // Token stream; first chunk aims for sub-20ms TTFT with INT8 + warm cache.
+  rpc GenerateStream(GenerateRequest) returns (stream GenerateResponse);
+
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc Stats(StatsRequest) returns (StatsResponse);
+}
+
+message GenerateRequest {
+  string prompt = 1;
+  int32 max_tokens = 2;
+  float temperature = 3;
+  float top_p = 4;
+  int32 top_k = 5;
+  string request_id = 6;
+  bool stream = 7;
+}
+
+message GenerateResponse {
+  string request_id = 1;
+  string text = 2;
+  repeated int32 token_ids = 3;
+  bool finished = 4;
+  LatencyMetrics latency = 5;
+}
+
+message LatencyMetrics {
+  double time_to_first_token_ms = 1;
+  double tokens_per_second = 2;
+  int32 prompt_tokens = 3;
+  int32 generated_tokens = 4;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool ready = 1;
+  string device = 2;
+  string model_name = 3;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  int32 active_sequences = 1;
+  int32 waiting_sequences = 2;
+  int32 kv_blocks_used = 3;
+  int32 kv_blocks_total = 4;
+  double gpu_utilization = 5;
+  int64 total_tokens_generated = 6;
+}
